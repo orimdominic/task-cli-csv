@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"text/tabwriter"
 	"time"
+
+	"github.com/mergestat/timediff"
 )
 
 type Task struct {
@@ -114,7 +116,7 @@ func add(title string, f *os.File) {
 		i, _ := strconv.Atoi(records[len(records)-1][0])
 		newRecordId = strconv.Itoa(i + 1)
 	}
-	wr.Write([]string{newRecordId, title, time.Now().String(), ""})
+	wr.Write([]string{newRecordId, title, time.Now().Format(time.DateTime), ""})
 
 	if err != nil {
 		fmt.Println(err)
@@ -139,7 +141,18 @@ func list(f *os.File) {
 	wr := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.TabIndent)
 	fmt.Fprintln(wr, "ID\tTitle\tCreated\tCompleted")
 	for _, r := range records[1:] {
-		fmt.Fprintf(wr, "%s\t%s\t%s\t%s\n", r[0], r[1], r[2], r[3])
+		created, _ := time.Parse(time.DateTime, r[2])
+		completed, _ := time.Parse(time.DateTime, r[3])
+		completedDiff := "nil"
+		if !completed.IsZero() {
+			completedDiff = timediff.TimeDiff(completed)
+		}
+
+		fmt.Fprintf(
+			wr,
+			"%s\t%s\t%s\t%s\n",
+			r[0], r[1], timediff.TimeDiff(created), completedDiff,
+		)
 	}
 	wr.Flush()
 }
@@ -159,10 +172,8 @@ func setAsCompleted(ID string, f *os.File) {
 	new = append(new, headers)
 
 	for _, r := range old[1:] {
-		// TODO use stdin to ask user if to update already-updated value
-		// when CompletedAt is set already
 		if r[0] == ID {
-			r[3] = time.Now().String()
+			r[3] = time.Now().Format(time.DateTime)
 			new = append(new, r)
 			continue
 		}
@@ -225,5 +236,4 @@ func delete(ID string, f *os.File) {
 }
 
 // TODO
-// Format date output to use time differences
-//
+// Ask user via Readline if they want to update already updated task completion date
