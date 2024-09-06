@@ -103,16 +103,20 @@ func add(title string, f *os.File) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	wr := csv.NewWriter(f)
-	err = wr.Write([]string{
-		strconv.Itoa(len(records)),
-		title,
-		time.Now().String(),
-		"",
-	})
+
+	var newRecordId string
+
+	if len(records) == 1 {
+		newRecordId = "1"
+	} else {
+		i, _ := strconv.Atoi(records[len(records)-1][0])
+		newRecordId = strconv.Itoa(i + 1)
+	}
+	wr.Write([]string{newRecordId, title, time.Now().String(), ""})
+
 	if err != nil {
-		fmt.Println("error writing record to csv:", err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
 	defer wr.Flush()
