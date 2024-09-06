@@ -107,8 +107,9 @@ func add(title string, f *os.File) {
 
 	var newRecordId string
 
-	if len(records) == 1 {
+	if len(records) < 2 {
 		newRecordId = "1"
+		wr.Write([]string{"ID", "Title", "CreatedAt", "CompletedAt"})
 	} else {
 		i, _ := strconv.Atoi(records[len(records)-1][0])
 		newRecordId = strconv.Itoa(i + 1)
@@ -130,7 +131,7 @@ func list(f *os.File) {
 		log.Fatal(err)
 	}
 
-	if len(records) == 1 {
+	if len(records) < 2 {
 		fmt.Println("No tasks in task list")
 		return
 	}
@@ -147,6 +148,10 @@ func setAsCompleted(ID string, f *os.File) {
 	old, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if len(old) < 2 {
+		fmt.Println("No tasks in task list")
 	}
 
 	headers := old[0]
@@ -185,6 +190,10 @@ func delete(ID string, f *os.File) {
 	old, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if len(old) < 2 {
+		fmt.Println("No tasks in task list")
 	}
 
 	headers := old[0]
