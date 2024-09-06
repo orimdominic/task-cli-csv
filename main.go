@@ -130,15 +130,14 @@ func list(f *os.File) {
 		log.Fatal(err)
 	}
 
-	records = records[1:]
-	if len(records) == 0 {
+	if len(records) == 1 {
 		fmt.Println("No tasks in task list")
 		return
 	}
 
 	wr := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.TabIndent)
 	fmt.Fprintln(wr, "ID\tTitle\tCreated\tCompleted")
-	for _, r := range records {
+	for _, r := range records[1:] {
 		fmt.Fprintf(wr, "%s\t%s\t%s\t%s\n", r[0], r[1], r[2], r[3])
 	}
 	wr.Flush()
