@@ -3,10 +3,10 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"strconv"
+	"syscall"
 	"time"
 )
 
@@ -14,21 +14,19 @@ type Task struct {
 	ID          int
 	Title       string
 	CreatedAt   string
-	CompletedAt int // REFACTOR make this a date somehow
+	CompletedAt string // REFACTOR make this a date somehow
 	// DueAt       int // REFACTOR make this a date somehow
 }
 
-func main() {
-	fileName := "./tasks.csv"
-	createStoreIfNotExist(fileName)
+var filename = "./tasks.csv"
 
+func main() {
 	if len(os.Args) < 2 {
 		showHelp()
 		return
 	}
 
 	cmd := os.Args[1:2][0]
-
 	switch cmd {
 	case "help":
 		showHelp()
@@ -38,61 +36,57 @@ func main() {
 			fmt.Println("error: please provide task title")
 			os.Exit(1)
 		}
-		add(os.Args[2])
+		f := loadFile(filename)
+		add(os.Args[2], f)
+		closeFile(f)
 
 	case "list":
-		list(fileName)
+		f := loadFile(filename)
+		list(f)
+		closeFile(f)
 
 	case "complete":
 		if len(os.Args) < 3 {
 			fmt.Println("error: please provide task ID")
 			os.Exit(1)
 		}
-		setAsCompleted(os.Args[2], fileName)
+		f := loadFile(filename)
+		setAsCompleted(os.Args[2], f)
+		closeFile(f)
 
 	case "delete":
 		if len(os.Args) < 3 {
 			fmt.Println("error: please provide task ID")
 			os.Exit(1)
 		}
-		delete(os.Args[2], fileName)
+		f := loadFile(filename)
+		delete(os.Args[2], f)
+		closeFile(f)
 
 	default:
 		showHelp()
 	}
+
 }
 
-func createStoreIfNotExist(filepath string) fs.FileInfo {
-	file, _ := os.Stat(filepath)
-	if file != nil {
-		return file
-	}
-
-	f, err := os.Create(filepath)
+func loadFile(filepath string) *os.File {
+	f, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
-		log.Fatal("Unable to create new file at", filepath, err)
-	}
-	defer f.Close()
-
-	wr := csv.NewWriter(f)
-	headers := []string{
-		"ID",
-		"Title",
-		"CreatedAt",
-		"CompletedAt",
-	}
-	err = wr.Write(headers)
-	if err != nil || wr.Error() != nil {
 		log.Fatal(err)
 	}
-	defer wr.Flush()
 
-	file, err = os.Stat(filepath)
+	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX)
 	if err != nil {
-		log.Fatal("Unable to fetch file at", filepath, err)
+		f.Close()
+		log.Fatal(err)
 	}
 
-	return file
+	return f
+}
+
+func closeFile(f *os.File) {
+	syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	f.Close()
 }
 
 func showHelp() {
@@ -104,13 +98,7 @@ tasks complete <taskId> - set task <taskId> as completed
 tasks delete <taskId> - delete task <taskId>`)
 }
 
-func add(title string) {
-	f, err := os.OpenFile("tasks.csv", os.O_RDWR, os.ModeAppend)
-	if err != nil {
-		log.Fatalln("failed to open file", err)
-	}
-	defer f.Close()
-
+func add(title string, f *os.File) {
 	records, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal(err)
@@ -125,19 +113,14 @@ func add(title string) {
 	})
 	if err != nil {
 		fmt.Println("error writing record to csv:", err)
+		os.Exit(1)
 	}
 	defer wr.Flush()
 
 	fmt.Println("✅ Added:", title)
 }
 
-func list(filepath string) {
-	f, err := os.Open(filepath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
+func list(f *os.File) {
 	records, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal(err)
@@ -160,12 +143,7 @@ func list(filepath string) {
 	}
 }
 
-func setAsCompleted(ID, filepath string) {
-	f, err := os.OpenFile(filepath, os.O_RDWR, os.ModeAppend)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+func setAsCompleted(ID string, f *os.File) {
 	old, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal(err)
@@ -187,11 +165,12 @@ func setAsCompleted(ID, filepath string) {
 	}
 	f.Close()
 
-	f, err = os.Create(filepath)
+	err = os.Remove(f.Name())
 	if err != nil {
-		log.Fatal("Unable to create new file at", filepath, err)
+		log.Fatal(err)
 	}
-	defer f.Close()
+
+	f = loadFile(filename)
 
 	wr := csv.NewWriter(f)
 	err = wr.WriteAll(new)
@@ -203,12 +182,7 @@ func setAsCompleted(ID, filepath string) {
 	// fmt.Println("✅ Set task:", title, "as completed")
 }
 
-func delete(ID, filepath string) {
-	f, err := os.OpenFile(filepath, os.O_RDWR, os.ModeAppend)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+func delete(ID string, f *os.File) {
 	old, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal(err)
@@ -225,11 +199,12 @@ func delete(ID, filepath string) {
 	}
 	f.Close()
 
-	f, err = os.Create(filepath)
+	err = os.Remove(f.Name())
 	if err != nil {
-		log.Fatal("Unable to create new file at", filepath, err)
+		log.Fatal(err)
 	}
-	defer f.Close()
+
+	f = loadFile(filename)
 
 	wr := csv.NewWriter(f)
 	err = wr.WriteAll(new)
