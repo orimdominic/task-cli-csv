@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"syscall"
+	"text/tabwriter"
 	"time"
 )
 
@@ -14,8 +15,7 @@ type Task struct {
 	ID          int
 	Title       string
 	CreatedAt   string
-	CompletedAt string // REFACTOR make this a date somehow
-	// DueAt       int // REFACTOR make this a date somehow
+	CompletedAt string
 }
 
 var filename = "./tasks.csv"
@@ -66,7 +66,6 @@ func main() {
 	default:
 		showHelp()
 	}
-
 }
 
 func loadFile(filepath string) *os.File {
@@ -90,12 +89,13 @@ func closeFile(f *os.File) {
 }
 
 func showHelp() {
-	// TODO probably want to use tabwriter to make it neater
-	fmt.Println(`How to use:
-tasks add <task title> - add a task
-tasks list - view list of tasks
-tasks complete <taskId> - set task <taskId> as completed
-tasks delete <taskId> - delete task <taskId>`)
+	fmt.Println("How to use:")
+	wr := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.TabIndent)
+	fmt.Fprintln(wr, "tasks add <task title>\tadd a task\ttasks add 'Have fun'")
+	fmt.Fprintln(wr, "tasks list\tview list of tasks\t")
+	fmt.Fprintln(wr, "tasks complete <taskId>\tset task <taskId> as completed\ttasks complete 1")
+	fmt.Fprintln(wr, "tasks delete <taskId>\tdelete task <taskId>\ttasks delete 1")
+	wr.Flush()
 }
 
 func add(title string, f *os.File) {
@@ -131,20 +131,17 @@ func list(f *os.File) {
 	}
 
 	records = records[1:]
-
 	if len(records) == 0 {
 		fmt.Println("No tasks in task list")
 		return
 	}
 
-	// TODO probably want to use tabwriter to make it neater
-	fmt.Println("ID", "Title", "Date Created", "Date Completed")
+	wr := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.TabIndent)
+	fmt.Fprintln(wr, "ID\tTitle\tCreated\tCompleted")
 	for _, r := range records {
-		for _, t := range r {
-			fmt.Print(t, " ")
-		}
-		fmt.Println("")
+		fmt.Fprintf(wr, "%s\t%s\t%s\t%s\n", r[0], r[1], r[2], r[3])
 	}
+	wr.Flush()
 }
 
 func setAsCompleted(ID string, f *os.File) {
@@ -175,7 +172,6 @@ func setAsCompleted(ID string, f *os.File) {
 	}
 
 	f = loadFile(filename)
-
 	wr := csv.NewWriter(f)
 	err = wr.WriteAll(new)
 	if err != nil {
@@ -183,7 +179,7 @@ func setAsCompleted(ID string, f *os.File) {
 	}
 
 	wr.Flush()
-	// fmt.Println("✅ Set task:", title, "as completed")
+	fmt.Println("✅ Set task:", ID, "as completed")
 }
 
 func delete(ID string, f *os.File) {
@@ -219,3 +215,7 @@ func delete(ID string, f *os.File) {
 	wr.Flush()
 	fmt.Println("✅ Deleted task", ID)
 }
+
+// TODO
+// Format date output to use time differences
+//
