@@ -1,4 +1,4 @@
-package main
+package pkg
 
 import (
 	"encoding/csv"
@@ -6,91 +6,49 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"syscall"
 	"text/tabwriter"
 	"time"
 
 	"github.com/mergestat/timediff"
 )
 
-type Task struct {
+/* type Task struct {
 	ID          int
 	Title       string
 	CreatedAt   string
 	CompletedAt string
-}
+} */
 
-var filename = "./tasks.csv"
-
-func main() {
+func Execute(filename string) {
 	if len(os.Args) < 2 {
-		showHelp()
+		ShowHelp()
 		return
 	}
 
 	cmd := os.Args[1:2][0]
 	switch cmd {
-	case "help":
-		showHelp()
 
 	case "add":
-		if len(os.Args) < 3 {
-			fmt.Println("error: please provide task title")
-			os.Exit(1)
-		}
-		f := loadFile(filename)
-		add(os.Args[2], f)
-		closeFile(f)
+		Add(os.Args, filename)
 
 	case "list":
-		f := loadFile(filename)
-		list(f)
-		closeFile(f)
+		List(os.Args, filename)
 
 	case "complete":
-		if len(os.Args) < 3 {
-			fmt.Println("error: please provide task ID")
-			os.Exit(1)
-		}
-		f := loadFile(filename)
-		setAsCompleted(os.Args[2], f)
-		closeFile(f)
+		SetAsCompleted(os.Args, filename)
 
 	case "delete":
-		if len(os.Args) < 3 {
-			fmt.Println("error: please provide task ID")
-			os.Exit(1)
-		}
-		f := loadFile(filename)
-		delete(os.Args[2], f)
-		closeFile(f)
+		Delete(os.Args, filename)
+
+	case "help":
+		ShowHelp()
 
 	default:
-		showHelp()
+		ShowHelp()
 	}
 }
 
-func loadFile(filepath string) *os.File {
-	f, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE, os.ModePerm)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX)
-	if err != nil {
-		f.Close()
-		log.Fatal(err)
-	}
-
-	return f
-}
-
-func closeFile(f *os.File) {
-	syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-	f.Close()
-}
-
-func showHelp() {
+func ShowHelp() {
 	fmt.Println("How to use:")
 	wr := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.TabIndent)
 	fmt.Fprintln(wr, "tasks add <task title>\tadd a task\ttasks add 'Have fun'")
@@ -100,13 +58,20 @@ func showHelp() {
 	wr.Flush()
 }
 
-func add(title string, f *os.File) {
+func Add(args []string, filepath string) {
+	if len(args) < 3 {
+		fmt.Println("error: please provide task title")
+		os.Exit(1)
+	}
+
+	f := LoadFile(filepath)
 	records, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal(err)
 	}
-	wr := csv.NewWriter(f)
 
+	title := args[2]
+	wr := csv.NewWriter(f)
 	var newRecordId string
 
 	if len(records) < 2 {
@@ -125,16 +90,18 @@ func add(title string, f *os.File) {
 	defer wr.Flush()
 
 	fmt.Println("✅ Added:", title)
+	CloseFile(f)
 }
 
-func list(f *os.File) {
+func List(args []string, filepath string) {
+	f := LoadFile(filepath)
 	records, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	if len(records) < 2 {
-		fmt.Println("No tasks in task list")
+		fmt.Println("No tasks in list yet")
 		return
 	}
 
@@ -155,9 +122,15 @@ func list(f *os.File) {
 		)
 	}
 	wr.Flush()
+	CloseFile(f)
 }
 
-func setAsCompleted(ID string, f *os.File) {
+func SetAsCompleted(args []string, filepath string) {
+	if len(args) < 3 {
+		fmt.Println("error: please provide task ID")
+		os.Exit(1)
+	}
+	f := LoadFile(filepath)
 	old, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal(err)
@@ -172,7 +145,7 @@ func setAsCompleted(ID string, f *os.File) {
 	new = append(new, headers)
 
 	for _, r := range old[1:] {
-		if r[0] == ID {
+		if r[0] == args[2] {
 			r[3] = time.Now().Format(time.DateTime)
 			new = append(new, r)
 			continue
@@ -186,7 +159,7 @@ func setAsCompleted(ID string, f *os.File) {
 		log.Fatal(err)
 	}
 
-	f = loadFile(filename)
+	f = LoadFile(filepath)
 	wr := csv.NewWriter(f)
 	err = wr.WriteAll(new)
 	if err != nil {
@@ -194,17 +167,24 @@ func setAsCompleted(ID string, f *os.File) {
 	}
 
 	wr.Flush()
-	fmt.Println("✅ Set task:", ID, "as completed")
+	fmt.Println("✅ Set task:", args[2], "as completed")
+	CloseFile(f)
 }
 
-func delete(ID string, f *os.File) {
+func Delete(args []string, filepath string) {
+	if len(args) < 3 {
+		fmt.Println("error: please provide task ID")
+		os.Exit(1)
+	}
+
+	f := LoadFile(filepath)
 	old, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	if len(old) < 2 {
-		fmt.Println("No tasks in task list")
+		fmt.Println("No tasks in list yet")
 	}
 
 	headers := old[0]
@@ -212,7 +192,7 @@ func delete(ID string, f *os.File) {
 	new = append(new, headers)
 
 	for _, r := range old[1:] {
-		if r[0] != ID {
+		if r[0] != args[2] {
 			new = append(new, r)
 		}
 	}
@@ -223,8 +203,7 @@ func delete(ID string, f *os.File) {
 		log.Fatal(err)
 	}
 
-	f = loadFile(filename)
-
+	f = LoadFile(filepath)
 	wr := csv.NewWriter(f)
 	err = wr.WriteAll(new)
 	if err != nil {
@@ -232,8 +211,6 @@ func delete(ID string, f *os.File) {
 	}
 
 	wr.Flush()
-	fmt.Println("✅ Deleted task", ID)
+	fmt.Println("✅ Deleted task", args[2])
+	CloseFile(f)
 }
-
-// TODO
-// Ask user via Readline if they want to update already updated task completion date
