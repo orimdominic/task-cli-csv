@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/orimdominic/cli-tasks-csv/pkg"
+	pkg "github.com/orimdominic/cli-tasks-csv/internal"
 )
 
 func main() {

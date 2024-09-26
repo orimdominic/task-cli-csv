@@ -1,6 +1,6 @@
 # cli-tasks-csv
 
-This project was done in trying to get better at Golang. The specifications for the project can be found at [goprojects/01-todo-list](https://github.com/dreamsofcode-io/goprojects/tree/main/01-todo-list)
+The specifications for the project can be found at [goprojects/01-todo-list](https://github.com/dreamsofcode-io/goprojects/tree/main/01-todo-list)
 
 ## How to build
 > [!NOTE]
@@ -8,7 +8,7 @@ This project was done in trying to get better at Golang. The specifications for 
 
 In the terminal of the cloned project, run the following to build the executable
 ```bash
-go build . -o tasks
+go build -o tasks ./cmd/cli
 ```
 
 Now you can run `./tasks help` to see how to use the CLI app.
